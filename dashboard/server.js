@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs/promises');
 const path = require('path');
+const os = require('os');
 const { google } = require('googleapis');
 const ExcelJS = require('exceljs');
 
@@ -13,7 +14,7 @@ const PUBLIC = path.join(__dirname, 'public');
 const PORT = Number(process.env.DASHBOARD_PORT) || 4173;
 const ANALYTICS_CACHE_MS = 10 * 60 * 1000;
 const { createReportCache } = require('./report-cache');
-const CACHE_DIR = process.env.DASHBOARD_CACHE_DIR || path.join(ROOT, 'temp-file');
+const CACHE_DIR = process.env.DASHBOARD_CACHE_DIR || (process.env.VERCEL ? path.join(os.tmpdir(), 'sitepulse-cache') : path.join(ROOT, 'temp-file'));
 const analyticsCache = createReportCache({ file: path.join(CACHE_DIR, 'analytics-cache.json'), freshMs: ANALYTICS_CACHE_MS });
 const clarityCache = new Map();
 const GA4_PROPERTIES = {

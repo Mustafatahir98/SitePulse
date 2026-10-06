@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "builds": [
+    {
+      "src": "dashboard/server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["dashboard/public/**"],
+        "excludeFiles": ["**/*.test.js", "index.js", "diagnostics.js"]
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/dashboard/server.js" }
+  ]
+}

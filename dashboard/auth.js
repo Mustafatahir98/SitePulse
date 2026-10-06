@@ -79,14 +79,20 @@ function createAuth(env = process.env) {
       let body;
       try {
         if (!(req.headers['content-type'] || '').startsWith('application/json')) throw new Error('JSON required');
-        let size = 0;
-        const chunks = [];
-        for await (const chunk of req) {
-          size += chunk.length;
-          if (size > 4096) throw new Error('Body too large');
-          chunks.push(chunk);
+        if (req.body !== undefined) {
+          const raw = typeof req.body === 'string' ? req.body : Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
+          if (Buffer.byteLength(raw, 'utf8') > 4096) throw new Error('Body too large');
+          body = JSON.parse(raw);
+        } else {
+          let size = 0;
+          const chunks = [];
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > 4096) throw new Error('Body too large');
+            chunks.push(chunk);
+          }
+          body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
         }
-        body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
         if (!body || typeof body.username !== 'string' || typeof body.password !== 'string' || body.password.length > 1024) throw new Error('Invalid credentials');
       } catch (_) {
         send(res, 400, { error: 'Enter a valid username and password.' });
@@ -112,7 +118,8 @@ function createAuth(env = process.env) {
     }
     if (['/login', '/login.js', '/login.css', '/lotus.webp'].includes(pathname)) return false;
     if (!configured) {
-      send(res, 503, { error: 'Dashboard login is not configured. Run npm run dashboard:setup.' });
+      if (pathname.startsWith('/api/')) send(res, 503, { error: 'Dashboard login is not configured. Run npm run dashboard:setup.' });
+      else { res.writeHead(302, { Location: '/login' }); res.end(); }
       return true;
     }
     if (!authenticated(req)) {

@@ -1,11 +1,13 @@
 const path = require('path');
+const os = require('os');
 const { google } = require('googleapis');
 const { createReportCache } = require('./report-cache');
 const { getGoogleAuth, requestOptions: googleRequestOptions } = require('./google-client');
 const ROOT = path.resolve(__dirname, '..');
 const PROPERTY = 'https://lotuspsychiatryandwellness.com/';
 const SITE = 'lotuspsychiatryandwellness_com';
-const CACHE_FILE = path.join(process.env.DASHBOARD_CACHE_DIR || path.join(ROOT, 'temp-file'), 'search-console-cache.json');
+const CACHE_DIR = process.env.DASHBOARD_CACHE_DIR || (process.env.VERCEL ? path.join(os.tmpdir(), 'sitepulse-cache') : path.join(ROOT, 'temp-file'));
+const CACHE_FILE = path.join(CACHE_DIR, 'search-console-cache.json');
 const FRESH_CACHE_MS = 2 * 60 * 1000;
 const reportCache = createReportCache({ file: CACHE_FILE, freshMs: FRESH_CACHE_MS });
 const shift = (date, days) => new Date(Date.parse(`${date}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);

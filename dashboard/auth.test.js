@@ -28,6 +28,12 @@ test('dashboard integration: redirects, protects all APIs/downloads, signs in an
   const blocked = await fetch(origin, { redirect: 'manual' });
   assert.equal(blocked.status, 302);
   assert.equal(blocked.headers.get('location'), '/login');
+  const sourcePaths = ['/index.js', '/dashboard/server.js', '/service-account.json', '/.env', '/package.json', '/README.md'];
+  for (const route of sourcePaths) {
+    const result = await fetch(origin + route, { redirect: 'manual' });
+    assert.equal(result.status, 302, route);
+    assert.equal(result.headers.get('location'), '/login', route);
+  }
   assert.equal((await fetch(origin + '/login')).status, 200);
   assert.equal((await fetch(origin + '/login.js')).status, 200);
   assert.equal((await fetch(origin + '/api/auth/login', login(origin, 'incorrect'))).status, 401);
@@ -41,6 +47,7 @@ test('dashboard integration: redirects, protects all APIs/downloads, signs in an
   assert.equal(page.status, 200);
   assert.match(await page.text(), /id="logoutButton"/);
   assert.match(page.headers.get('cache-control'), /no-store/);
+  for (const route of sourcePaths) assert.equal((await fetch(origin + route, { headers })).status, 404, route);
   const loggedIn = await fetch(origin + '/login', { headers, redirect: 'manual' });
   assert.equal(loggedIn.headers.get('location'), '/');
   const logout = await fetch(origin + '/api/auth/logout', { method: 'POST', headers: { ...headers, Origin: origin } });
@@ -57,6 +64,19 @@ test('missing configuration blocks data instead of opening the dashboard', async
   assert.equal((await fetch(origin + '/api/sites')).status, 503);
   assert.equal((await fetch(origin + '/login')).status, 200);
   assert.equal((await fetch(origin + '/api/auth/login', login(origin))).status, 503);
+});
+
+test('login accepts Vercel parsed request bodies and rejects oversized bodies', async t => {
+  const auth = createAuth(await config());
+  const origin = await start(t, async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    req.body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    await auth.handle(req, res, '/api/auth/login');
+  });
+  assert.equal((await fetch(origin, login(origin))).status, 200);
+  const oversized = login(origin, 'x'.repeat(5000));
+  assert.equal((await fetch(origin, oversized)).status, 400);
 });
 
 test('repeated incorrect attempts are limited and unsupported methods rejected', async t => {

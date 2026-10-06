@@ -49,6 +49,6 @@ The tests cover login protection, caching, failure handling, and desktop/mobile 
 
 ## Hosting
 
-The dashboard exports a Node.js request handler and also runs as a local HTTP server. It is not yet configured as a complete Vercel deployment: routing, persistent report/cache storage and scraper scheduling need hosting configuration. Use HTTPS for a live dashboard and set credentials through your hosting provider's environment settings.
+The dashboard exports a Node.js request handler and also runs as a local HTTP server. `vercel.json` routes all requests through the dashboard function and prevents the repository root from being served as static source. See [Vercel setup](dashboard/VERCEL.md). Persistent report storage, Google credentials and scraper scheduling still need hosting configuration. Use HTTPS for a live dashboard and set credentials through your hosting provider's environment settings.
 
 Never commit `.env`, service-account credentials, login secrets or private client reports. `.env.example` contains placeholders only.
