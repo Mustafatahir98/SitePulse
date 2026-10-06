@@ -10,9 +10,15 @@ const requestOptions = { timeout: 10000, ...(!proxyConfigured ? { agent } : {}) 
 
 function getGoogleAuth(scopes) {
   const keyFile = path.resolve(ROOT, process.env.GOOGLE_SERVICE_ACCOUNT_KEY || 'service-account.json');
-  const key = `${keyFile}:${scopes.join(',')}`;
+  let credentials;
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    try { credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON); }
+    catch (_) { throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON must contain valid service-account JSON.'); }
+    if (credentials.type !== 'service_account' || !credentials.client_email || !credentials.private_key) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is missing required service-account fields.');
+  }
+  const key = `${credentials ? 'environment' : keyFile}:${scopes.join(',')}`;
   if (!clients.has(key)) clients.set(key, new google.auth.GoogleAuth({
-    keyFile, scopes,
+    ...(credentials ? { credentials } : { keyFile }), scopes,
     clientOptions: { transporterOptions: { ...requestOptions, retryConfig: { retry: 1, noResponseRetries: 1 } } },
   }));
   return clients.get(key);

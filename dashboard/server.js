@@ -10,12 +10,13 @@ require('dotenv').config({ path: path.join(ROOT, '.env') });
 const { getSearchReport, isSearchConsoleConfigured } = require('./search-console');
 const { getGoogleAuth, requestOptions: googleRequestOptions } = require('./google-client');
 const auth = require('./auth').createAuth();
+const reportStorage = require('./report-storage').createReportStorage();
 const PUBLIC = path.join(__dirname, 'public');
 const PORT = Number(process.env.DASHBOARD_PORT) || 4173;
 const ANALYTICS_CACHE_MS = 10 * 60 * 1000;
 const { createReportCache } = require('./report-cache');
 const CACHE_DIR = process.env.DASHBOARD_CACHE_DIR || (process.env.VERCEL ? path.join(os.tmpdir(), 'sitepulse-cache') : path.join(ROOT, 'temp-file'));
-const analyticsCache = createReportCache({ file: path.join(CACHE_DIR, 'analytics-cache.json'), freshMs: ANALYTICS_CACHE_MS });
+const analyticsCache = createReportCache({ file: path.join(CACHE_DIR, 'analytics-cache.json'), freshMs: ANALYTICS_CACHE_MS, remote: require('./blob-cache').createBlobCache('analytics') });
 const clarityCache = new Map();
 const GA4_PROPERTIES = {
   lotuspsychiatryandwellness_com: process.env.GA4_PROPERTY_LOTUSPSYCHIATRYANDWELLNESS_COM || '534285283',
@@ -37,15 +38,6 @@ const MIME = {
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(body));
-}
-
-function siteLabel(host) {
-  return host
-    .replace(/_com$|_tv$|_org$|_net$|_co$/i, '')
-    .split('_')
-    .filter(Boolean)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
 }
 
 function normalizePagePath(value) {
@@ -193,33 +185,11 @@ async function getClarityReport(siteId, days = 3) {
 }
 
 async function getSites() {
-  const files = await fs.readdir(ROOT);
-  const dataFiles = files.filter(name => /^oldScrapedData_.+\.json$/i.test(name));
-
-  return Promise.all(dataFiles.map(async file => {
-    const id = file.replace(/^oldScrapedData_/, '').replace(/\.json$/i, '');
-    const filePath = path.join(ROOT, file);
-    const [raw, stat] = await Promise.all([fs.readFile(filePath, 'utf8'), fs.stat(filePath)]);
-    const rows = JSON.parse(raw);
-    const firstHost = rows[0]?.url ? new URL(rows[0].url).hostname.replace(/^www\./, '') : id.replace(/_/g, '.');
-    const reports = files
-      .filter(name => name.startsWith(`CWV_Report_${id}_`) && name.endsWith('.xlsx'))
-      .sort((a, b) => b.localeCompare(a));
-    const latestReport = reports[0] || null;
-    const reportDate = latestReport?.match(/(\d{4}-\d{2}-\d{2})\.xlsx$/)?.[1] || null;
-
-    return {
-      id,
-      name: rows.find(row => row.siteName)?.siteName || siteLabel(id),
-      host: firstHost,
-      pageCount: rows.length,
-      updatedAt: reportDate || stat.mtime.toISOString(),
-      latestReport,
-      searchConsole: isSearchConsoleConfigured(id),
-      analytics: Boolean(GA4_PROPERTIES[id]),
-      clarity: Boolean(CLARITY_PROJECTS[id] && process.env.CLARITY_API_TOKEN),
-    };
-  })).then(sites => sites.sort((a, b) => a.name.localeCompare(b.name)));
+  const sites = await reportStorage.listSites();
+  return sites.map(site => ({ ...site,
+    searchConsole: isSearchConsoleConfigured(site.id), analytics: Boolean(GA4_PROPERTIES[site.id]),
+    clarity: Boolean(CLARITY_PROJECTS[site.id] && process.env.CLARITY_API_TOKEN),
+  })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function serveFile(res, filePath, downloadName) {
@@ -264,7 +234,7 @@ async function sendWorkbook(res, workbook, filename) {
 }
 
 async function loadSiteRows(siteId) {
-  return JSON.parse(await fs.readFile(path.join(ROOT, `oldScrapedData_${siteId}.json`), 'utf8'));
+  return reportStorage.readRows(siteId);
 }
 
 function searchMetricMap(rows) {
@@ -521,7 +491,7 @@ async function handler(req, res) {
       const sites = await getSites();
       const site = sites.find(item => item.id === siteMatch[1]);
       if (!site) return json(res, 404, { error: 'Site not found.' });
-      const rows = JSON.parse(await fs.readFile(path.join(ROOT, `oldScrapedData_${site.id}.json`), 'utf8'));
+      const rows = await loadSiteRows(site.id);
       return json(res, 200, { site, rows: rows.map(row => ({ ...row, traffic: null })), analytics: {
         enabled: Boolean(GA4_PROPERTIES[site.id]), status: GA4_PROPERTIES[site.id] ? 'loading' : 'not-configured', totals: null,
       } });
@@ -532,7 +502,9 @@ async function handler(req, res) {
       const sites = await getSites();
       const site = sites.find(item => item.id === downloadMatch[1]);
       if (!site?.latestReport) return json(res, 404, { error: 'No Excel report is available.' });
-      return serveFile(res, path.join(ROOT, site.latestReport), site.latestReport);
+      const data = await reportStorage.readReport(site.id, site.latestReport);
+      res.writeHead(200, { 'Content-Type': MIME['.xlsx'], 'Content-Disposition': `attachment; filename="${site.latestReport}"`, 'Cache-Control': 'private, no-store' });
+      return res.end(data);
     }
 
     const relative = requestUrl.pathname === '/' ? 'index.html' : requestUrl.pathname === '/login' ? 'login.html' : requestUrl.pathname.slice(1);
@@ -543,7 +515,7 @@ async function handler(req, res) {
     return serveFile(res, publicPath);
   } catch (error) {
     console.error(error);
-    return json(res, 500, { error: 'Dashboard request failed.' });
+    return json(res, error.status || 500, { error: error.status === 503 ? error.message : 'Dashboard request failed.' });
   }
 }
 

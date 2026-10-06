@@ -9,7 +9,7 @@ const SITE = 'lotuspsychiatryandwellness_com';
 const CACHE_DIR = process.env.DASHBOARD_CACHE_DIR || (process.env.VERCEL ? path.join(os.tmpdir(), 'sitepulse-cache') : path.join(ROOT, 'temp-file'));
 const CACHE_FILE = path.join(CACHE_DIR, 'search-console-cache.json');
 const FRESH_CACHE_MS = 2 * 60 * 1000;
-const reportCache = createReportCache({ file: CACHE_FILE, freshMs: FRESH_CACHE_MS });
+const reportCache = createReportCache({ file: CACHE_FILE, freshMs: FRESH_CACHE_MS, remote: require('./blob-cache').createBlobCache('search-console') });
 const shift = (date, days) => new Date(Date.parse(`${date}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 const validDate = date => /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
 

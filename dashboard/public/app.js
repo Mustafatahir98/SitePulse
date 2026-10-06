@@ -381,8 +381,9 @@ function closeMenu() {
 async function init() {
   try {
     const response = await fetch('/api/sites');
-    if (!response.ok) throw new Error('Website list could not be loaded.');
-    state.sites = await response.json();
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'Website list could not be loaded.');
+    state.sites = payload;
     if (!state.sites.length) throw new Error('No generated website reports were found.');
     renderSites();
     await loadSite(state.sites[0].id);

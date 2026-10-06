@@ -17,7 +17,7 @@ Open http://localhost:4173. Sessions expire after eight hours. Sign out clears t
 
 The server exports a request handler and login uses a signed, HttpOnly, SameSite=Strict cookie with Secure enabled in production. Set `DASHBOARD_USERNAME`, `DASHBOARD_PASSWORD_HASH`, and `DASHBOARD_SESSION_SECRET` in Vercel environment settings using the values generated in your local `.env`. Set `DASHBOARD_ORIGIN` to the exact HTTPS site origin if a proxy changes the Host header (no trailing slash).
 
-`vercel.json` provides function routing through the dashboard handler. See [Vercel setup](VERCEL.md). A live dashboard still needs login environment variables, persistent report storage and Google integration credentials; private local report data is not committed or automatically uploaded. Cache writes on Vercel use temporary storage until a shared store is configured.
+`vercel.json` provides function routing through the dashboard handler. See [Vercel setup](VERCEL.md) for private Blob report upload and server-only integration credentials. Private local report data is uploaded by `npm run reports:upload` and remains excluded from Git. Google caches also persist to the connected private Blob store on Vercel.
 
 The built-in attempt limiter allows five attempts per IP per 15 minutes per running instance. For a public Vercel deployment, add a shared rate limiter or platform firewall rule because separate instances do not share this counter. Signed sessions need no in-memory session store. Sign out clears the current browser's cookie; a copied cookie remains valid until expiry or credential rotation.
 

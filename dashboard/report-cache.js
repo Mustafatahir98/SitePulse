@@ -2,10 +2,11 @@ const fs = require('fs/promises');
 const path = require('path');
 
 // Exact report keys prevent a cached date range or page leaking into another view.
-function createReportCache({ file, freshMs = 10 * 60 * 1000, maxAgeMs = 7 * 86400000, clock = Date.now }) {
+function createReportCache({ file, freshMs = 10 * 60 * 1000, maxAgeMs = 7 * 86400000, clock = Date.now, remote = null }) {
   const entries = new Map();
   const pending = new Map();
   const failures = new Map();
+  const remoteLoads = new Map();
   let loading;
   let writing = Promise.resolve();
   const encode = (_, value) => value instanceof Map ? { __reportMap: [...value] } : value;
@@ -44,7 +45,13 @@ function createReportCache({ file, freshMs = 10 * 60 * 1000, maxAgeMs = 7 * 8640
       entries.set(key, entry);
       failures.delete(key);
       // An incomplete report should not replace a complete last-known-good report.
-      return save().then(() => entry);
+      return save().then(async () => {
+        if (remote) {
+          try { await remote.write(key, JSON.parse(JSON.stringify(entry, encode))); }
+          catch (_) { console.warn('Private report cache sync delayed; current report remains available.'); }
+        }
+        return entry;
+      });
     }).catch(error => {
       if (failures.size >= 100) failures.delete(failures.keys().next().value);
       failures.set(key, { until: clock() + 30000, error });
@@ -56,6 +63,20 @@ function createReportCache({ file, freshMs = 10 * 60 * 1000, maxAgeMs = 7 * 8640
   async function get(key, loader, { force = false } = {}) {
     await load();
     let cached = entries.get(key);
+    if (remote && (!cached || clock() - cached.time >= freshMs)) {
+      if (!remoteLoads.has(key)) remoteLoads.set(key, (async () => {
+        try {
+          const value = await remote.read(key);
+          if (value?.data && Number.isFinite(value.time) && clock() - value.time <= maxAgeMs) {
+            const entry = JSON.parse(JSON.stringify(value), decode);
+            if (!entries.has(key) && entries.size >= 100) entries.delete(entries.keys().next().value);
+            if (!entries.has(key) || entry.time > entries.get(key).time) entries.set(key, entry);
+          }
+        } catch (_) { console.warn('Private report cache read delayed; requesting live data.'); }
+      })().finally(() => remoteLoads.delete(key)));
+      await remoteLoads.get(key);
+      cached = entries.get(key);
+    }
     if (cached && clock() - cached.time > maxAgeMs) { entries.delete(key); cached = null; }
     if (!force && cached && clock() - cached.time < freshMs) return metadata(cached, 'fresh');
     const failure = failures.get(key);
