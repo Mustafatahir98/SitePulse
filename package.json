@@ -1,0 +1,26 @@
+{
+  "name": "sitepulse",
+  "version": "1.0.0",
+  "description": "Website health, traffic and search performance dashboard",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js && node diagnostics.js",
+    "dashboard": "node dashboard/server.js",
+    "dashboard:setup": "node dashboard/setup-auth.js",
+    "test": "node --test dashboard/auth.test.js dashboard/report-cache.test.js dashboard/ui.test.js"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "cheerio": "^1.2.0",
+    "diff": "^9.0.0",
+    "dotenv": "^18.0.1",
+    "exceljs": "^4.4.0",
+    "fs-extra": "^11.4.0",
+    "googleapis": "^171.4.0",
+    "nodemailer": "^10.0.10",
+    "puppeteer": "^24.39.0",
+    "xlsx": "^0.18.5",
+    "xml2js": "^0.6.2"
+  }
+}

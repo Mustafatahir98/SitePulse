@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Core Web Vitals report dashboard">
+  <title>CoreVitals — Reports</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%2313251e%22/><text x=%2212%22 y=%2241%22 font-size=%2226%22 font-family=%22Arial%22 font-weight=%22700%22 fill=%22%23d9f35b%22>CV</text></svg>">
+  <link rel="stylesheet" href="styles.css?v=6">
+  <link rel="stylesheet" href="refined.css?v=1">
+</head>
+<body>
+  <button class="menu-button" id="menuButton" aria-label="Open site menu" aria-expanded="false">☰</button>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <img class="brand-logo" src="lotus.webp" alt="Lotus Psychiatry & Wellness">
+    </div>
+    <div class="nav-label">Your websites</div>
+    <nav id="siteList" class="site-list" aria-label="Website reports">
+      <div class="sidebar-loading">Loading sites…</div>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="live-dot"></span>
+      <div><strong>Reports workspace</strong><span>Website health & insights</span></div>
+    </div>
+    <button id="logoutButton" class="logout-button" type="button">Sign out</button>
+  </aside>
+
+  <main class="main">
+    <div class="loading-state" id="loadingState"><div class="spinner"></div><p>Preparing your report…</p></div>
+    <div class="error-state hidden" id="errorState"><h2>Report unavailable</h2><p id="errorMessage"></p><button onclick="location.reload()">Try again</button></div>
+
+    <div id="report" class="hidden">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Website performance report</div>
+          <h1 id="siteName"></h1>
+          <a id="siteUrl" class="site-url" target="_blank" rel="noreferrer"></a>
+        </div>
+        <div class="topbar-actions">
+          <button id="searchConsoleButton" class="sc-button hidden" type="button">Search performance</button>
+          <button id="clarityButton" class="clarity-button hidden" type="button">Visitor insights</button>
+          <details class="export-menu">
+            <summary>Export reports <span aria-hidden="true">⌄</span></summary>
+            <div class="export-options">
+              <a id="downloadButton" class="download-button">Page performance · Excel</a>
+              <a id="analyticsExcelButton" class="data-download hidden">Google Analytics · Excel</a>
+              <a id="searchConsoleExcelButton" class="data-download hidden">Search Console · Excel</a>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      <div class="data-status" id="dataStatus" role="status" aria-live="polite">
+        <div><span class="status-indicator" aria-hidden="true"></span><span id="analyticsStatus">Loading analytics</span></div>
+        <button id="retryAnalytics" type="button">Refresh analytics</button>
+      </div>
+      <section class="summary-grid" id="summaryGrid" aria-label="Report overview"></section>
+
+      <section class="report-panel">
+        <div class="panel-head">
+          <div><h2>Page performance</h2><p id="reportMeta"></p></div>
+          <div class="controls">
+            <label class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="Search page or URL…"></label>
+            <select id="trafficRange" aria-label="Traffic date range">
+              <option value="1d">Yesterday</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d" selected>Last 30 days</option>
+              <option value="custom">Custom range</option>
+            </select>
+            <div id="customDateControls" class="custom-date-controls hidden">
+              <input id="trafficStartDate" type="date" aria-label="Traffic start date" required>
+              <input id="trafficEndDate" type="date" aria-label="Traffic end date" required>
+              <button id="applyTrafficRange" type="button">Apply</button>
+            </div>
+            <div class="device-toggle" role="group" aria-label="Device">
+              <button class="active" data-device="mobile">Mobile</button>
+              <button data-device="desktop">Desktop</button>
+            </div>
+            <select id="statusFilter" aria-label="Filter by performance">
+              <option value="all">All scores</option>
+              <option value="good">Good (90+)</option>
+              <option value="needs">Needs work (50–89)</option>
+              <option value="poor">Poor (&lt;50)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Page</th><th>Page views</th><th>Users</th><th>Performance</th><th>Accessibility</th><th>Best practices</th><th>SEO</th><th>Details</th></tr></thead>
+            <tbody id="reportRows"></tbody>
+          </table>
+          <div id="emptyState" class="empty-state hidden">No pages match these filters.</div>
+        </div>
+        <div class="pagination"><span id="pageInfo"></span><div><button id="prevPage" aria-label="Previous page">←</button><button id="nextPage" aria-label="Next page">→</button></div></div>
+      </section>
+    </div>
+  </main>
+
+  <div class="drawer-backdrop hidden" id="drawerBackdrop"></div>
+  <dialog id="detailDialog">
+    <button class="dialog-close" id="dialogClose" aria-label="Close">×</button>
+    <div id="dialogContent"></div>
+  </dialog>
+  <dialog id="searchDialog" class="sc-dialog" aria-labelledby="scTitle">
+    <button class="dialog-close" id="searchDialogClose" aria-label="Close">×</button>
+    <div id="searchDialogContent"></div>
+  </dialog>
+  <dialog id="clarityDialog" class="clarity-dialog" aria-labelledby="clarityTitle">
+    <button class="dialog-close" id="clarityDialogClose" aria-label="Close">×</button>
+    <div id="clarityDialogContent"></div>
+  </dialog>
+  <script src="app.js?v=6"></script>
+</body>
+</html>

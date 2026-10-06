@@ -1,0 +1,26 @@
+# Secrets and machine-specific settings
+.env
+.env.*
+!.env.example
+service-account*.json
+*.pem
+*.key
+.claude/
+.codex/
+.aws/
+
+# Dependencies and generated/private client data
+node_modules/
+temp-file/
+snapshots/
+oldScrapedData*.json
+metaData.json
+*.xlsx
+*.log
+
+# Historical local copies and operating-system files
+Code-updation/
+changes.txt
+desktop.ini
+Thumbs.db
+.DS_Store
