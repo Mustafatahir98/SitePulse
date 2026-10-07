@@ -10,7 +10,7 @@
     "dashboard:setup": "node dashboard/setup-auth.js",
     "reports:upload": "node dashboard/upload-reports.js",
     "dashboard:export-env": "node dashboard/export-vercel-env.js",
-    "test": "node --test dashboard/auth.test.js dashboard/report-cache.test.js dashboard/storage.test.js dashboard/ui.test.js"
+    "test": "node --test dashboard/auth.test.js dashboard/clarity.test.js dashboard/google-client.test.js dashboard/report-cache.test.js dashboard/storage.test.js dashboard/ui.test.js"
   },
   "dependencies": {
     "@vercel/blob": "^2.3.0",

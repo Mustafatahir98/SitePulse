@@ -39,10 +39,28 @@ test('returns stale data immediately, keeps last good result on failure and back
   assert.equal(stale.cache.refreshing, true);
   fail(new Error('ECONNRESET'));
   await new Promise(resolve => setImmediate(resolve));
-  const fallback = await cache.get('a', loader, { force: true });
+  const fallback = await cache.get('a', loader);
   assert.equal(fallback.total, 12);
   assert.equal(fallback.cache.refreshError, true);
   assert.equal(calls, 1);
+});
+
+test('explicit retry calls upstream again immediately after a failed first request', async t => {
+  const file = await fixture(t);
+  const cache = createReportCache({ file });
+  let calls = 0;
+  const loader = async () => {
+    calls++;
+    if (calls === 1) throw new Error('Transient upstream failure');
+    return { total: 42 };
+  };
+  await assert.rejects(cache.get('search:28d', loader), /Transient upstream failure/);
+  await assert.rejects(cache.get('search:28d', loader), /Transient upstream failure/);
+  assert.equal(calls, 1, 'Automatic requests still respect failure backoff');
+  const retried = await cache.get('search:28d', loader, { force: true });
+  assert.equal(calls, 2, 'The Retry button makes a new upstream request');
+  assert.equal(retried.total, 42);
+  assert.equal(retried.cache.status, 'live');
 });
 
 test('separates date/page keys, rejects expired data and preserves complete reports', async t => {

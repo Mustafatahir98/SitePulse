@@ -80,7 +80,7 @@ function createReportCache({ file, freshMs = 10 * 60 * 1000, maxAgeMs = 7 * 8640
     if (cached && clock() - cached.time > maxAgeMs) { entries.delete(key); cached = null; }
     if (!force && cached && clock() - cached.time < freshMs) return metadata(cached, 'fresh');
     const failure = failures.get(key);
-    if (failure && failure.until > clock()) {
+    if (!force && failure && failure.until > clock()) {
       if (cached) return metadata(cached, 'stale', { refreshError: true });
       throw failure.error;
     }

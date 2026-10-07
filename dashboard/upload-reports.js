@@ -51,7 +51,7 @@ async function uploadReports({ root = ROOT, blob = createBlobStore(), dryRun = f
   const catalog = validateCatalog({ version: 1, uploadedAt: new Date().toISOString(), sites: [...sites.values()] });
   await blob.writeJson(CATALOG, catalog, true);
   let cacheEntries = 0;
-  for (const [namespace, file] of [['analytics', 'analytics-cache.json'], ['search-console', 'search-console-cache.json']]) {
+  for (const [namespace, file] of [['analytics', 'analytics-cache.json'], ['search-console', 'search-console-cache.json'], ['clarity', 'clarity-cache.json']]) {
     try {
       const entries = JSON.parse(await fs.readFile(path.join(root, 'temp-file', file), 'utf8'));
       for (const [key, entry] of entries) {
@@ -63,7 +63,7 @@ async function uploadReports({ root = ROOT, blob = createBlobStore(), dryRun = f
       if (error.code !== 'ENOENT') log(`Saved ${namespace} cache could not be synced; live reports will still load.`);
     }
   }
-  log(`Report catalog published. ${cacheEntries} saved Google responses synced. Local files unchanged.`);
+  log(`Report catalog published. ${cacheEntries} saved integration responses synced. Local files unchanged.`);
   return { siteCount: planned.length, reportCount: planned.reduce((sum, site) => sum + site.reports.length, 0), cacheEntries };
 }
 

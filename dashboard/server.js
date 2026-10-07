@@ -17,7 +17,7 @@ const ANALYTICS_CACHE_MS = 10 * 60 * 1000;
 const { createReportCache } = require('./report-cache');
 const CACHE_DIR = process.env.DASHBOARD_CACHE_DIR || (process.env.VERCEL ? path.join(os.tmpdir(), 'sitepulse-cache') : path.join(ROOT, 'temp-file'));
 const analyticsCache = createReportCache({ file: path.join(CACHE_DIR, 'analytics-cache.json'), freshMs: ANALYTICS_CACHE_MS, remote: require('./blob-cache').createBlobCache('analytics') });
-const clarityCache = new Map();
+const getClarityReport = require('./clarity').createClarityReports();
 const GA4_PROPERTIES = {
   lotuspsychiatryandwellness_com: process.env.GA4_PROPERTY_LOTUSPSYCHIATRYANDWELLNESS_COM || '534285283',
 };
@@ -161,26 +161,6 @@ async function loadAnalyticsReport(siteId, dateRange) {
     },
     pages,
   };
-  return data;
-}
-
-async function getClarityReport(siteId, days = 3) {
-  const projectId = CLARITY_PROJECTS[siteId];
-  const token = process.env.CLARITY_API_TOKEN;
-  if (!projectId || !token) throw Object.assign(new Error('Clarity is not configured for this website.'), { status: 404 });
-  const numOfDays = [1, 2, 3].includes(Number(days)) ? Number(days) : 3;
-  const cacheKey = `${siteId}:${numOfDays}`;
-  const cached = clarityCache.get(cacheKey);
-  if (cached && Date.now() - cached.createdAt < ANALYTICS_CACHE_MS) return cached.data;
-
-  const response = await fetch(`https://www.clarity.ms/export-data/api/v1/project-live-insights?numOfDays=${numOfDays}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(30000),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw Object.assign(new Error(payload.message || 'Clarity data is temporarily unavailable.'), { status: response.status });
-  const data = { projectId, numOfDays, insights: payload };
-  clarityCache.set(cacheKey, { createdAt: Date.now(), data });
   return data;
 }
 
@@ -445,8 +425,8 @@ async function handler(req, res) {
         console.error('Search Console report failed:', error.code || status || '', error.message);
         const message = status === 403
           ? 'Search Console access denied. Add the dashboard service-account email to this property and enable the Search Console API in its Google Cloud project.'
-          : [400, 404].includes(error.status) ? error.message : 'Search Console data is temporarily unavailable. Please try again.';
-        return json(res, [400, 403, 404].includes(status) ? status : 502, { error: message });
+          : error.code === 'GOOGLE_CONFIGURATION_ERROR' || [400, 404].includes(error.status) ? error.message : 'Search Console data is temporarily unavailable. Please try again.';
+        return json(res, [400, 403, 404, 503].includes(status) ? status : 502, { error: message });
       }
     }
 
@@ -457,12 +437,12 @@ async function handler(req, res) {
       } catch (error) {
         const status = error.status || Number(error.code);
         console.error('Clarity report failed:', error.code || status || '', error.message);
-        const message = status === 401 || status === 403
+        const message = status === 503 ? error.message : status === 401 || status === 403
           ? 'Clarity access denied. Check the API token and project permissions.'
           : status === 429
             ? 'Clarity daily API limit reached. Try again tomorrow.'
             : 'Clarity data is temporarily unavailable. Please try again.';
-        return json(res, [401, 403, 404, 429].includes(status) ? status : 502, { error: message });
+        return json(res, [401, 403, 404, 429, 503].includes(status) ? status : 502, { error: message });
       }
     }
 
@@ -477,6 +457,10 @@ async function handler(req, res) {
         const report = await getAnalyticsReport(site.id, range, requestUrl.searchParams.get('refresh') === '1');
         return json(res, 200, { ...report, pages: Object.fromEntries(report.pages) });
       } catch (error) {
+        if (error.code === 'GOOGLE_CONFIGURATION_ERROR') {
+          console.error('GA4 configuration failed:', error.message);
+          return json(res, 503, { error: error.message });
+        }
         const status = error.response?.status || Number(error.code);
         console.error('GA4 report failed:', error.code || status || '', error.message);
         const message = status === 403 ? 'Google Analytics access denied. Check this property and service-account permissions.'

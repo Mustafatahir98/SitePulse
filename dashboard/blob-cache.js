@@ -2,7 +2,7 @@ const { createBlobStore, configured, cachePath } = require('./blob-store');
 
 function createBlobCache(namespace, { env = process.env, store = createBlobStore({ env }) } = {}) {
   if (!env.VERCEL || !configured(env)) return null;
-  if (!['analytics', 'search-console'].includes(namespace)) throw new Error('Invalid cache namespace.');
+  if (!['analytics', 'search-console', 'clarity'].includes(namespace)) throw new Error('Invalid cache namespace.');
   return {
     async read(key) {
       const entry = await store.readJson(cachePath(namespace, key), { fresh: true });

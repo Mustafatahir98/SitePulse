@@ -13,7 +13,18 @@ test('dashboard renders before slow GA, preserves saved data on failure, and wor
   Object.assign(process.env, {
     DASHBOARD_USERNAME: 'ui-test', DASHBOARD_PASSWORD_HASH: await hashPassword('ui-test-password-only'),
     DASHBOARD_SESSION_SECRET: 'ui-test-secret-longer-than-thirty-two-characters', DASHBOARD_CACHE_DIR: directory,
+    CLARITY_PROJECT_ID: 'ui-test-project', CLARITY_API_TOKEN: 'ui-test-token-only',
   });
+  const originalFetch = global.fetch;
+  let clarityCalls = 0;
+  global.fetch = async (url, options) => {
+    if (String(url).startsWith('https://www.clarity.ms/')) {
+      clarityCalls++;
+      return { ok: true, status: 200, json: async () => [{ metricName: 'Traffic', information: [{ sessions: '42' }] }] };
+    }
+    return originalFetch(url, options);
+  };
+  t.after(() => { global.fetch = originalFetch; });
   const { google } = require('googleapis');
   google.auth.GoogleAuth = class {};
   let gaCalls = 0;
@@ -65,6 +76,15 @@ test('dashboard renders before slow GA, preserves saved data on failure, and wor
   await page.waitForFunction(() => document.getElementById('dataStatus').dataset.state === 'stale');
   assert.match(await page.$eval('#analyticsStatus', node => node.textContent), /saved analytics/);
   assert.ok(await page.$('.traffic-metric'), 'Report remains visible on failed refresh');
+  await page.click('#clarityButton');
+  await page.waitForSelector('.clarity-section');
+  assert.match(await page.$eval('#clarityDialogContent', node => node.textContent), /Traffic.*42/);
+  assert.match(await page.$eval('#clarityDialogContent', node => node.textContent), /Updated/);
+  await page.click('#clarityDialogClose');
+  await page.click('#clarityButton');
+  await page.waitForSelector('.clarity-section');
+  assert.equal(clarityCalls, 1, 'Reopening Clarity uses saved data without consuming another API call');
+  await page.click('#clarityDialogClose');
   await page.click('#searchConsoleButton');
   await page.waitForSelector('.sc-tiles');
   assert.match(await page.$eval('#scBody', node => node.textContent), /countries/);

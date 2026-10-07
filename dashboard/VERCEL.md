@@ -38,6 +38,10 @@ npm run dashboard:export-env
 
 This creates the private ignored `.env.vercel-integrations` file. Add its values to Vercel Production: `GOOGLE_SERVICE_ACCOUNT_JSON`, `GA4_PROPERTY_LOTUSPSYCHIATRYANDWELLNESS_COM`, and, if configured locally, `CLARITY_PROJECT_ID` and `CLARITY_API_TOKEN`. Redeploy after changing environment settings. Google credentials are read from the server-only JSON environment variable on Vercel; local setup can continue using the service-account file.
 
+For `GOOGLE_SERVICE_ACCOUNT_JSON`, paste the complete JSON value after `GOOGLE_SERVICE_ACCOUNT_JSON=` from the generated file, without the variable name or additional surrounding quotes. A local `.env` or `service-account.json` is excluded from deployment and cannot configure Vercel. Missing or malformed deployment credentials now return a specific configuration message instead of a temporary connection error. Ensure the variable applies to Production, then create a new deployment; changing it does not update an existing deployment.
+
 Analytics and Search Console caches persist in private Blob storage per report key, in addition to temporary instance files. Copied cache entries carry their original timestamps. They cannot replace a working Google integration after they expire or when a different range is selected. The scraper still runs locally; run `npm run reports:upload` after generating new report files to publish them to the live dashboard.
+
+Clarity also persists successful reports to the same private Blob store. Its cache is keyed by project and day range, refreshes after 12 hours, and shows saved-report timestamps. Deploy the updated dashboard code to enable this cache; older deployments use only an instance-local Clarity cache. Ensure both `CLARITY_PROJECT_ID` and `CLARITY_API_TOKEN` are set in Production before redeploying.
 
 Repository visibility is separate from deployment routing. A public GitHub repository exposes committed source. To keep the repository private, use GitHub repository Settings → General → Danger Zone → Change repository visibility → Private.

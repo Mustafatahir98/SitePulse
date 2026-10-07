@@ -328,7 +328,9 @@ async function loadSite(id, preserveView = false) {
   analyticsController?.abort();
   analyticsRequestId++;
   state.sc.requestId++;
+  state.clarity.requestId++;
   el('searchDialog').close();
+  el('clarityDialog').close();
   siteController = new AbortController();
   el('errorState').classList.add('hidden');
   if (!preserveView) {
@@ -864,7 +866,7 @@ async function loadSearchConsole(force = false) {
     sc.refreshError = payload.cache?.refreshError ? 'refresh-failed' : '';
     sc.expanded = false;
     sc.cursor = null;
-    if (!force && payload.cache?.status === 'stale') {
+    if (!force && payload.cache?.refreshing) {
       setTimeout(() => {
         if (el('searchDialog').open && requestId === sc.requestId) loadSearchConsole(true);
       }, 500);
@@ -898,6 +900,12 @@ function renderClarityBody() {
   }
   if (clarity.error) {
     host.innerHTML = `<div class="clarity-head"><div class="dialog-kicker">Microsoft Clarity</div><h2 id="clarityTitle">Visitor insights</h2></div><div class="sc-notice"><strong>Clarity data is unavailable.</strong><span>${escapeHtml(clarity.error)}</span></div>`;
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'sc-retry';
+    retry.textContent = 'Retry connection';
+    retry.addEventListener('click', loadClarity);
+    host.querySelector('.sc-notice').append(retry);
     return;
   }
   if (!clarity.data) return;
@@ -907,6 +915,13 @@ function renderClarityBody() {
     clarity.days = Number(button.dataset.clarityDays);
     loadClarity();
   }));
+  if (clarity.data.cache?.fetchedAt) {
+    const saved = new Date(clarity.data.cache.fetchedAt).toLocaleString();
+    const notice = document.createElement('p');
+    notice.className = 'sc-meta';
+    notice.textContent = `Updated ${saved}${clarity.data.cache.status === 'stale' ? ' · Showing saved insights; live refresh is delayed.' : ''}`;
+    host.querySelector('.clarity-head').after(notice);
+  }
 }
 
 async function loadClarity() {
@@ -915,8 +930,10 @@ async function loadClarity() {
   clarity.loading = true;
   clarity.error = '';
   renderClarityBody();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 35000);
   try {
-    const response = await fetch(`/api/sites/${state.activeSite.id}/clarity?days=${clarity.days}`);
+    const response = await fetch(`/api/sites/${state.activeSite.id}/clarity?days=${clarity.days}`, { signal: controller.signal });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || 'Clarity data could not be loaded.');
     if (requestId !== clarity.requestId) return;
@@ -924,8 +941,8 @@ async function loadClarity() {
   } catch (error) {
     if (requestId !== clarity.requestId) return;
     clarity.data = null;
-    clarity.error = error.message;
-  }
+    clarity.error = error.name === 'AbortError' ? 'Clarity is taking longer than expected. Please retry.' : error.message;
+  } finally { clearTimeout(timeout); }
   clarity.loading = false;
   renderClarityBody();
 }
